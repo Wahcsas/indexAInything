@@ -4,13 +4,13 @@ import openai
 import os
 from API_Connector.api_abstract import connectToAPI
 
-os.environ['OPENAI_API_KEY'] = 'xxx'
+# os.environ['OPENAI_API_KEY'] = 'xxx'
 
 
 class ConnectOpenAI(connectToAPI):
     def __init__(self, dummy, url):
         super().__init__(dummy, url)
-        openai.api_key = "EMPTY"
+        openai.api_key = "EMPTY"  # load savely from envioment later one
         openai.base_url = "http://localhost:8000/v1/"
         # try to use openaio client ???
 
@@ -32,6 +32,6 @@ if __name__ == "__main__":
         {"role": "user", "content": "Explain asynchronous programming in the style of the pirate Blackbeard."}
     ]
 
-    answer = api_connection.send_prompt(model='WestLake-7B-v2',
+    answer = api_connection.send_prompt(model='Mistral-7B-Instruct-v0.3',
                                         prompt=messages)
     print(answer)
