@@ -11,11 +11,10 @@ class ConnectOpenAI(connectToAPI):
     def __init__(self, dummy, url):
         super().__init__(dummy, url)
         openai.api_key = "EMPTY"  # load savely from envioment later one
-        openai.base_url = "http://localhost:8000/v1/"
+        openai.base_url = url
         # try to use openaio client ???
 
     def send_prompt(self, model: str, prompt: list[dict], top_p: float = 1, temp: float = 1) -> str:
-        print(prompt)
         response = openai.chat.completions.create(model=model,
                                                   messages=prompt,
                                                   stream=False,
