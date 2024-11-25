@@ -25,12 +25,12 @@ class ConnectOpenAI(connectToAPI):
 
 
 if __name__ == "__main__":
-    api_connection = ConnectOpenAI(dummy=False, url='http://localhost:8000/v1/')
+    api_connection = ConnectOpenAI(dummy=False, url='http://localhost:11434/v1/')
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Explain asynchronous programming in the style of the pirate Blackbeard."}
     ]
 
-    answer = api_connection.send_prompt(model='Mistral-7B-Instruct-v0.3',
+    answer = api_connection.send_prompt(model='llama3.2:latest',
                                         prompt=messages)
     print(answer)

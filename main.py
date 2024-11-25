@@ -13,8 +13,10 @@ def split_pdf_text(pdf_file: str):
 
 
 def prompt_llm_for_persons(prompt_list):
-    openAI_connector = openAI.ConnectOpenAI(dummy=False, url="http://localhost:8000/v1/")
+    openAI_connector = openAI.ConnectOpenAI(dummy=False, url=Constants.LLM_URL)
     prompt_creator = prompt_utils.PromptCreator(Constants.SYSTEM_PROMPT)
+    set_up_examples(prompt_creator)
+    print(prompt_creator.get_prompt_history())
     names_list: list = []
     total_parts = len(prompt_list)
     for nr, prompt in enumerate(prompt_list):
@@ -31,8 +33,16 @@ def prompt_llm_for_persons(prompt_list):
     return names_list
 
 
+def set_up_examples(prompt_creator:prompt_utils.PromptCreator):
+    for user_prompt, assistant_answer in zip(Constants.EXAMLES_USER, Constants.EXAMPLES_ASSISTANT):
+        prompt_creator.add_user_prompt(user_prompt)
+        prompt_creator.add_assistant_message(assistant_answer)
+
+
+
 def index_for_names(pdf_file):
     split_text = split_pdf_text(pdf_file=pdf_file)
+    print('Test_len: ',len(split_text), '\n EXT: ', split_text)
     names: list = prompt_llm_for_persons(split_text)
     return names
 

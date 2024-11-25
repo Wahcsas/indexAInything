@@ -153,9 +153,18 @@ if __name__ == "__main__":
     accumsan porttitor, facilisis luctus, metus."""
 
     text_parts = TextTokenSplitter().split_text_by_token_paragraphs(test_text)
-    token_counter = TokenCounter()
+    token_counter = TokenCounter(count_typ='openAI')
     total_text_tokens = token_counter.count_tokens(test_text)
-    print('TOTAL TEXT TOKENS: ', total_text_tokens)
+    print('OPEN AI TOTAL TEXT TOKENS: ', total_text_tokens)
+    for i, chunk in enumerate(text_parts):
+        print('TOKENS: ', token_counter.count_tokens(chunk))
+        print(f"Chunk {i + 1}:\n{chunk}\n")
+
+    print('---------------------------------')
+
+    token_counter = TokenCounter(count_typ='estimate')
+    total_text_tokens = token_counter.count_tokens(test_text)
+    print('ESTIMATED TOTAL TEXT TOKENS: ', total_text_tokens)
     for i, chunk in enumerate(text_parts):
         print('TOKENS: ', token_counter.count_tokens(chunk))
         print(f"Chunk {i + 1}:\n{chunk}\n")
