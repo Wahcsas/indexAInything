@@ -6,6 +6,12 @@ from Constants import Constants
 from utils.token_counter import TokenCounter
 
 
+
+
+
+#[json.loads(x) for x in a]
+
+
 def get_pdf_text(pdf_file: str):
     doc = pymupdf.open(pdf_file)
     text_pages: list = [page.get_text() for page in doc]
@@ -168,3 +174,6 @@ if __name__ == "__main__":
     for i, chunk in enumerate(text_parts):
         print('TOKENS: ', token_counter.count_tokens(chunk))
         print(f"Chunk {i + 1}:\n{chunk}\n")
+
+
+
