@@ -3,7 +3,7 @@ import pandas as pd
 from Constants import Constants
 from utils import str_utils, prompt_utils
 from API_Connector import openAI
-from utils.json_utils import json_to_dataframe
+from utils.json_utils import JsonStrToDict
 
 
 def split_pdf_text(pdf_file: str):
@@ -21,8 +21,8 @@ def prompt_llm_for_persons(prompt_list):
     names_list: list = []
     total_parts = len(prompt_list)
 
-    df_list: list = []
-
+    dict_list: list = []
+    json_parser = JsonStrToDict()
     for nr, prompt in enumerate(prompt_list):
         prompt_creator.add_user_prompt(Constants.USER_BASE_PROMPT + prompt)
         prompts = prompt_creator.get_prompt_history()
@@ -32,16 +32,17 @@ def prompt_llm_for_persons(prompt_list):
                                                    top_p=1,
                                                    temp=1)
         print('AI RESPONSE is: ', ai_response)
-        current_df = json_to_dataframe(ai_response)
-        print(f'CURRENT DF is \n {current_df}')
+        current_dict = json_parser.json_to_dict(ai_response)
+        print(f'CURRENT DF is \n {current_dict}')
 
-        if len(current_df) > 0:
-            print(f'Appending from {nr} with len: {len(current_df)}')
-            df_list.append(current_df)
+        if len(current_dict) > 0:
+            print(f'Appending from {nr} with len: {len(current_dict)}')
+            dict_list.append(current_dict)
         names_list.append(ai_response)
         prompt_creator.delete_prompt_history()
 
         #  add logic to search for and correct json then extract actual pdf page
+    df_list = [pd.DataFrame(d) for d in dict_list]
     combined_df = pd.concat(df_list, ignore_index=True)
     print('COMBINED DF: \n', combined_df)
     return combined_df

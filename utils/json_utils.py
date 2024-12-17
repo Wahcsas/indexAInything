@@ -1,86 +1,195 @@
 import json
 import re
-import pandas as pd
+
+from utils.other_utils import flatten_list
 
 
-def json_to_dataframe(json_str: str, attempts: int = 3) -> pd.DataFrame:
-    """
-    Converts a JSON array within a string to a pandas DataFrame.
-    Tries to fix malformed JSON strings recursively using final_attempt_fix.
-    """
-    if json_str is None:
-        print('Input string is None. Returning empty DataFrame.')
-        return pd.DataFrame()
-    json_str = prefix_json_str(json_str=json_str)
-    # Extract JSON array from the string
-    match = re.search(r"\[.*?]", json_str)
-
-    if isinstance(match, re.Match):
-        flat_array_str = match.group(0)
-    elif isinstance(match, list):
-        json_list = [json.loads(json_list_element) for json_list_element in match]
-        flat_array_str = str([lv2_el for lv1_list in json_list for lv2_el in lv1_list])
-    else:
-        print("No JSON array found in the string.")
-        return pd.DataFrame()
-
-    try:
-        # Parse the JSON string and convert to DataFrame
-        data = json.loads(flat_array_str)
-        return pd.DataFrame(data)
-    except json.JSONDecodeError as e:
-        if attempts > 0:
-            print(f"JSON decoding failed due to: {e}. Attempting to fix...")
-            fixed_json_str = rebuild_json_string(flat_array_str)
-            return json_to_dataframe(fixed_json_str, attempts - 1)
-        else:
-            print("Failed to parse JSON after multiple attempts.")
-            return pd.DataFrame()
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return pd.DataFrame()
+import json
+import re
+from utils.other_utils import flatten_list
 
 
-def prefix_json_str(json_str: str) -> str:
-    """
-    prefixe common mistake in a json str
-    :param json_str:
-    :return: fixed json_st
-    """
-    json_str = json_str.replace('\n', '')
-    json_str = json_str.replace('\'', '\"')
-    return json_str
+class JsonStrToDict:
+    def __init__(self, max_attempts: int = 3):
+        """
+        Initialize with a maximum number of attempts to fix a JSON string.
+        """
+        self.max_attempts = max_attempts
+
+    def json_to_dict(self, json_str: str) -> list:
+        """
+        Converts a JSON array within a string to a list of dictionaries.
+        Tries to fix malformed JSON strings recursively.
+
+        :param json_str: Input JSON string.
+        :return: List of dictionaries.
+        """
+        if json_str is None:
+            print("Input string is None. Returning empty list.")
+            return []
+
+        json_str = self._prefix_json_str(json_str)
+        match_all = re.findall(r"\[.*?]", json_str)
+        json_list = []
+
+        if match_all:
+            for element in match_all:
+                try:
+                    json_list.extend(json.loads(element))
+                except json.JSONDecodeError as e:
+                    if self.max_attempts > 0:
+                        print(f"JSON decoding failed: {e}. Attempting to fix...")
+                        fixed_json_str = self.fix_json_string(str(match_all))
+                        return self.json_to_dict(fixed_json_str)
+        return json_list
+
+    def fix_json_string(self, json_str: str) -> str:
+        """
+        Attempts to fix a malformed JSON string by extracting key-value pairs.
+
+        :param json_str: Malformed JSON string.
+        :return: Fixed JSON string.
+        """
+        json_str = self._remove_invalid_characters(json_str)
+        potential_objects = self._extract_json_objects(json_str)
+
+        if not potential_objects:
+            return "[]"
+
+        fixed_data_list = self._process_potential_objects(potential_objects)
+        return json.dumps(fixed_data_list)
+
+    def rebuild_json_string(self, json_str: str) -> str:
+        """
+        Rebuilds a JSON string by splitting, cleaning, and reassembling key-value pairs.
+
+        :param json_str: Input JSON string.
+        :return: Rebuilt JSON string.
+        """
+        split_string = self._split_and_clean_string(json_str)
+        keys, values = self._extract_keys_and_values(split_string)
+        return str(dict(zip(keys, values)))
+
+    @staticmethod
+    def _prefix_json_str(json_str: str) -> str:
+        """
+        Fixes common JSON string mistakes such as single quotes and newlines.
+
+        :param json_str: JSON string.
+        :return: Fixed JSON string.
+        """
+        return json_str.replace("\n", "").replace("'", '"')
+
+    @staticmethod
+    def _remove_invalid_characters(json_str: str) -> str:
+        """
+        Removes invalid characters not part of the JSON structure.
+
+        :param json_str: JSON string.
+        :return: Cleaned JSON string.
+        """
+        return re.sub(r'[^\{\}\[\]\,\"\:\w\s\.\-]', "", json_str)
+
+    @staticmethod
+    def _extract_json_objects(json_str: str) -> list:
+        """
+        Extracts JSON-like objects (curly braces or square brackets).
+
+        :param json_str: JSON string.
+        :return: List of extracted JSON objects.
+        """
+        objects = re.findall(r"\{.*?}", json_str)
+        return objects or re.findall(r"\[.*?]", json_str)
+
+    def _process_potential_objects(self, potential_objects: list) -> list:
+        """
+        Processes potential JSON objects, fixing common issues.
+
+        :param potential_objects: List of JSON-like strings.
+        :return: List of fixed JSON dictionaries.
+        """
+        data_list = []
+        for obj_str in potential_objects:
+            fixed_obj_str = self._fix_common_json_issues(obj_str)
+            try:
+                data_list.append(json.loads(fixed_obj_str))
+            except json.JSONDecodeError as e:
+                rebuilt_str = self.rebuild_json_string(fixed_obj_str)
+                try:
+                    data_list.append(json.loads(rebuilt_str))
+                except json.JSONDecodeError:
+                    print(f"Failed to fix object: {fixed_obj_str} due to {e}")
+        return data_list
+
+    @staticmethod
+    def _fix_common_json_issues(json_str: str) -> str:
+        """
+        Fixes common JSON syntax issues like missing quotes.
+
+        :param json_str: JSON string.
+        :return: Fixed JSON string.
+        """
+        json_str = re.sub(r"'", '"', json_str)  # Replace single quotes
+        json_str = re.sub(r"(\w+)\s*:", r'"\1":', json_str)  # Quote keys
+        return re.sub(r':\s*([^,"\{\}\[\]]+)\s*(,|\})', r': "\1"\2', json_str)  # Quote values
+
+    @staticmethod
+    def _split_and_clean_string(json_str: str) -> list:
+        """
+        Splits JSON strings by separators and removes unwanted characters.
+
+        :param json_str: JSON string.
+        :return: Cleaned list of split components.
+        """
+        split_string = json_str.split(",")
+        split_string = [s.split('"') for s in split_string]
+        split_string = flatten_list(split_string)
+        split_string = [s.split(":") for s in split_string]
+        split_string = flatten_list(split_string)
+        return [s for s in split_string if not JsonStrToDict.has_only_special_chars(s)]
+
+    @staticmethod
+    def _extract_keys_and_values(split_string: list) -> (list, list):
+        """
+        Extracts keys and values from a split JSON string.
+
+        :param split_string: List of JSON string components.
+        :return: Tuple of keys and values.
+        """
+        keys = [x for i, x in enumerate(split_string) if i % 2 == 0]
+        values = [x for i, x in enumerate(split_string) if i % 2 != 0]
+        return keys, values
+
+    @staticmethod
+    def has_only_special_chars(s: str) -> bool:
+        """
+        Checks if a string contains only special characters.
+
+        :param s: Input string.
+        :return: True if only special characters, False otherwise.
+        """
+        return not any(c.isalnum() for c in s)
 
 
-def rebuild_json_string(json_str: str) -> str:
-    """
-    Attempts to fix a malformed JSON string by extracting key-value pairs
-    and rebuilding the JSON array.
-    """
-    # Remove any characters that are not part of the JSON structure
-    json_str = re.sub(r'[^\{\}\[\]\,\"\:\w\s\.\-]', '', json_str)
-    # Find all JSON-like objects
-    potential_objects = re.findall(r'\{.*?\}', json_str)
-    data_list = []
-    for obj_str in potential_objects:
-        # Try to fix common issues
-        obj_str = re.sub(r'\'', '"', obj_str)  # Replace single quotes with double quotes
-        obj_str = re.sub(r'(\w+)\s*:', r'"\1":', obj_str)  # Ensure keys are quoted
-        obj_str = re.sub(r':\s*([^,"\{\}\[\]]+)\s*(,|\})', r': "\1"\2', obj_str)  # Ensure values are quoted
-        try:
-            data = json.loads(obj_str)
-            data_list.append(data)
-        except json.JSONDecodeError as e:
-            print(f"Failed to fix object: {obj_str} due to {e}")
-    if data_list:
-        return json.dumps(data_list)
-    else:
-        return '[]'
-
-
-def has_only_special_chars(s: str) -> bool:
-    """
-    Checks if the input string consists only of special characters.
-    """
-    return not any(c.isalnum() for c in s)
-
+if __name__ == "__main__":
+    # Example JSON strings
+    json_strings = [
+        '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]',
+        'Random text before [{"name": "Charlie", "age": "35"}] and after',
+        'Malformed JSON [{"name": "Dana", "age": 40,] Missing bracket',
+        '{"name": "Eve", "age": 28}',  # Not in an array
+        None,
+        'No JSON here',
+        '[{"name": "Frank", "age": 33}], [{"name": "Grace", "age": "25"}]',
+        '[{"name": "Heidi", "age": 45}, {"name": "Ivan", "age":, "city": "Berlin"}]',
+        '[{"name": "Judy", "age": 29}, {"name": "Karl", "age": 31,}]',
+        'Invalid JSON [{name: "Leo", age: 22}, {name: "Mona", age: 27}]',
+    ]
+    dict_list = []
+    parser = JsonStrToDict()
+    for s in json_strings:
+        print(f"\nProcessing string: {s}")
+        result = parser.json_to_dict(s)
+        if len(result) > 0:
+            dict_list.append(result)
+    dict_list = flatten_list(dict_list)
