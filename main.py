@@ -1,13 +1,15 @@
 import gradio as gr
 import pandas as pd
 from Constants import Constants
+from indexer.index_from_list import run_name_index
 from utils import str_utils, prompt_utils
 from API_Connector import openAI
 from utils.json_utils import JsonStrToDict
+from utils.other_utils import clean_pandas_df
 
 
 def split_pdf_text(pdf_file: str):
-    pdf_text = str_utils.get_pdf_text(pdf_file)
+    pdf_text = str_utils.get_total_pdf_text(pdf_file)
     split_to_tokens = str_utils.TextTokenSplitter()
     split_text: list = split_to_tokens.split_text_by_token_paragraphs(pdf_text)
     return split_text
@@ -33,7 +35,7 @@ def prompt_llm_for_persons(prompt_list):
                                                    temp=1)
         print('AI RESPONSE is: ', ai_response)
         current_dict = json_parser.json_to_dict(ai_response)
-        print(f'CURRENT DF is \n {current_dict}')
+        print(f'CURRENT dict is \n {current_dict}')
 
         if len(current_dict) > 0:
             print(f'Appending from {nr} with len: {len(current_dict)}')
@@ -44,7 +46,7 @@ def prompt_llm_for_persons(prompt_list):
         #  add logic to search for and correct json then extract actual pdf page
     df_list = [pd.DataFrame(d) for d in dict_list]
     combined_df = pd.concat(df_list, ignore_index=True)
-    print('COMBINED DF: \n', combined_df)
+    combined_df = clean_pandas_df(combined_df)
     return combined_df
 
 
@@ -57,9 +59,11 @@ def set_up_examples(prompt_creator: prompt_utils.PromptCreator):
 def index_for_names(pdf_file):
     split_text = split_pdf_text(pdf_file=pdf_file)
     print('Test_len: ', len(split_text), '\n EXT: ', split_text)
-    names: pd.DataFrame = prompt_llm_for_persons(split_text)
-    print('NAMES: \n', names)
-    return names
+    names_df: pd.DataFrame = prompt_llm_for_persons(split_text)
+    names_df['id'] = names_df[Constants.EXTRACT_COLUMN_KEYS[0]] + '_' + names_df[Constants.EXTRACT_COLUMN_KEYS[1]]
+    names_df = names_df.set_index('id')
+    name_to_pages = run_name_index(names_list=list(names_df.index), pdf_path=pdf_file, exclude_pages=[])
+    return name_to_pages
 
 
 def main():
@@ -79,3 +83,17 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+test_string_no_brackets = '{"First Name": "David", "Last Name": "Miller"}'
+test_string= "[{'First Name': 'M. Steven', 'Last Name': 'Fish'}]"
+json_parser = JsonStrToDict()
+dict_list = []
+for nr, text in enumerate([test_string_no_brackets, test_string]):
+    current_dict = json_parser.json_to_dict(text)
+    if len(current_dict) > 0:
+            print(f'Appending from {nr} with len: {len(current_dict)}')
+            dict_list.append(current_dict)
+df_list = [pd.DataFrame(d) for d in dict_list]
+combined_df = pd.concat(df_list, ignore_index=True)

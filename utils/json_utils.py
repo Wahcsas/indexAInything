@@ -30,6 +30,9 @@ class JsonStrToDict:
 
         json_str = self._prefix_json_str(json_str)
         match_all = re.findall(r"\[.*?]", json_str)
+        if len(match_all) == 0:
+            match_all = re.findall(r"\{.*?}", json_str)  # if no json list try with only {}
+            match_all = re.findall(r"\[.*?]", str(match_all))
         json_list = []
 
         if match_all:

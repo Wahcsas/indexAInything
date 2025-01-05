@@ -1,37 +1,19 @@
-import docx
+import pathlib
+
 import pymupdf
 import re
-from docx import Document
-from pathlib import Path
-
-# Paths to your files (adjust these as necessary)
-docx_path = Path(r"PATH_to_file_with_persons")
-pdf_path = Path(r"path_to_book.pdf")
-
-exclude_pages = [1, 2, 3, 4, 5, 6, 7,  31, 32, 33, 34, 35, 58, 79, 105, 139, 140, 141, 163, 164, 165, 196, 197, 198, 222, 223, 257, 258, 259, 260,
-                 280, 300, 301, 302, 303, 304, 305, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351]  # pages to exclude, e.g., table of contents
-footnote_patterns = [
-    r'\d+\t\nSee name+',
-    r'\d+\t\nvgl\. name+',
-    r'\d+\t\nname+'
-]
+from Constants import Constants
 
 
-def extract_names_from_docx(docx_path):
-    # Load the DOCX file
-    doc = docx.Document(docx_path)
-    names = []
+def read_pdf_pages(pdf_path: str | pathlib.Path) -> dict[int:str]:
+    """
+    Reads a PDF file and extracts text from each page.
 
-    # Assuming each name is in a separate paragraph
-    for para in doc.paragraphs:
-        text = para.text.strip()
-        if text:  # Make sure there's text and not just an empty string
-            names.append(text)
-
-    return names
-
-
-def read_pdf_with_pages(pdf_path):
+    :param pdf_path: The path to the PDF file.
+    :type pdf_path: str
+    :return: A dictionary where keys are page numbers (starting from 1) and values are the extracted text.
+    :rtype: dict
+    """
     # Open the PDF file
     doc = pymupdf.open(pdf_path)
     pdf_text = {}
@@ -46,18 +28,14 @@ def read_pdf_with_pages(pdf_path):
     return pdf_text
 
 
-# Extract names and read PDF
-names_list = extract_names_from_docx(docx_path)
-pdf_pages = read_pdf_with_pages(pdf_path)
-
-
-def find_name_pages(names, pdf_text, exclude_pages: list, footnote_patterns):
+def find_name_pages(names: list, pdf_pages: dict, exclude_pages: list, footnote_patterns: list[str]) -> dict[
+                                                                                                        str:list[int]]:
     name_pages = {name: [] for name in names}
 
     for name in names:
-        parts = name.split(', ')
-        last_name = parts[0]
-        first_name = parts[1] if len(parts) > 1 else ''
+        parts = name.split('_')
+        last_name = parts[0] if len(parts[0]) > 0 else ''
+        first_name = parts[1] if len(parts) > 1 and len(parts[1]) > 0 else ''
 
         # Pattern to match full name, last name, and possessive forms, but not as part of footnotes
         name_pattern = rf'\b{last_name}(?:,?\s+{first_name})?\b|\b{first_name}\s+{last_name}\b'
@@ -67,7 +45,7 @@ def find_name_pages(names, pdf_text, exclude_pages: list, footnote_patterns):
         # Prepare regex for footnotes
         footnote_regexes = [re.compile(pattern, re.IGNORECASE) for pattern in footnotes_reg_with_name]
 
-        for page_number, text in pdf_text.items():
+        for page_number, text in pdf_pages.items():
             if page_number in exclude_pages:
                 continue  # Skip excluded pages
 
@@ -83,41 +61,17 @@ def find_name_pages(names, pdf_text, exclude_pages: list, footnote_patterns):
                 else:
                     name_pages[name].append(page_number)
             # If not found in the main text, don't add the page number even if found in the footnote
-
+    # make pages unique
+    name_pages = {name: set(pages) for name, pages in name_pages.items() if len(pages) > 0}
     return name_pages
 
 
-# Use the function to find the pages for each name
-name_to_pages = find_name_pages(names=names_list, pdf_text=pdf_pages,
-                                exclude_pages=exclude_pages, footnote_patterns=footnote_patterns)
+def run_name_index(pdf_path: str, names_list: list, exclude_pages: list) -> dict[str:list[int]]:
+    # Extract names and read PDF
+    pdf_pages = read_pdf_pages(pdf_path)
 
-# Print some sample outputs to verify
-for name, pages in list(name_to_pages.items())[:5]:  # print results for the first 5 names
-    print(f"{name}: {sorted(pages)}")
+    # Use the function to find the pages for each name
+    name_to_pages = find_name_pages(names=names_list, pdf_pages=pdf_pages,
+                                    exclude_pages=exclude_pages, footnote_patterns=Constants.FOOTNOTE_RE_PATTERNS)
 
-
-def update_docx_with_pages(docx_path, name_to_pages, output_path):
-    # Load the existing DOCX file
-    doc = Document(docx_path)
-
-    # Iterate over each paragraph, check if it's a name, and append page numbers if it is
-    for para in doc.paragraphs:
-        original_text = para.text.strip()
-        if original_text in name_to_pages:
-            pages = sorted(name_to_pages[original_text])
-            # Create a string of page numbers, separated by commas
-            pages_str = ', '.join(map(str, pages))
-            # Update the paragraph text with page numbers
-            para.text = f"{original_text} {pages_str}"
-
-    # Save the updated document to a new file
-    doc.save(output_path)
-
-
-# Define the path for the output DOCX file
-output_docx_path = Path(docx_path.parent, docx_path.stem + '_pages_added' + docx_path.suffix)
-
-# Update the DOCX file with the pages
-update_docx_with_pages(docx_path, name_to_pages, output_docx_path)
-
-print("The DOCX file has been updated and saved to:", output_docx_path)
+    return name_to_pages

@@ -6,14 +6,8 @@ from Constants import Constants
 from utils.token_counter import TokenCounter
 
 
-
-
-
-#[json.loads(x) for x in a]
-
-
-def get_pdf_text(pdf_file: str):
-    doc = pymupdf.open(pdf_file)
+def get_total_pdf_text(pdf_path: str):
+    doc = pymupdf.open(pdf_path)
     text_pages: list = [page.get_text() for page in doc]
     pure_text: str = ' '.join(text_pages)
     return pure_text
@@ -43,7 +37,7 @@ def split_with_overlap(elemet_to_split: str | list, num_parts: int, overlap: int
     return result
 
 
-def clean_text(text:str, clean_side='both'):
+def clean_text(text: str, clean_side='both'):
     """
     Cleans the input text by removing spaces from the specified side(s).
 
@@ -174,6 +168,3 @@ if __name__ == "__main__":
     for i, chunk in enumerate(text_parts):
         print('TOKENS: ', token_counter.count_tokens(chunk))
         print(f"Chunk {i + 1}:\n{chunk}\n")
-
-
-
