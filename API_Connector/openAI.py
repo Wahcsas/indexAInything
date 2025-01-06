@@ -3,6 +3,8 @@ import os
 import openai
 import os
 from API_Connector.api_abstract import connectToAPI
+from Constants import Constants
+
 
 # os.environ['OPENAI_API_KEY'] = 'xxx'
 
@@ -19,6 +21,7 @@ class ConnectOpenAI(connectToAPI):
                                                   messages=prompt,
                                                   stream=False,
                                                   top_p=top_p,
+                                                  max_tokens=Constants.CONTEXT_LENGTH,
                                                   temperature=temp)
 
         return response.choices[0].message.content

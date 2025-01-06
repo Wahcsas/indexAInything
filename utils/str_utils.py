@@ -83,7 +83,7 @@ class TextTokenSplitter:
         for tokens, paragraph in zip(tokens_per_paragraph, paragraphs):
             if tokens == 0:
                 continue
-            if len(current_chunk) + tokens + 2 < Constants.MAX_TOKEN_LENGTH:  # +2 for potential new lines
+            if len(current_chunk) + tokens + 2 < Constants.TEXT_SPLIT_MAX_TOKEN_LENGTH:  # +2 for potential new lines
                 current_chunk = self._join_paragraph(current_chunk, paragraph)
             else:
                 paragraphs_fitted.extend(self._process_large_paragraph(current_chunk, paragraph, tokens))
@@ -112,14 +112,14 @@ class TextTokenSplitter:
         chunks = []
         if current_chunk:
             chunks.append(current_chunk)
-        if tokens > Constants.MAX_TOKEN_LENGTH:
+        if tokens > Constants.TEXT_SPLIT_MAX_TOKEN_LENGTH:
             chunks.extend(self._split_and_clean_paragraph(paragraph, tokens))
         else:
             chunks.append(paragraph)
         return chunks
 
     def _split_and_clean_paragraph(self, paragraph, tokens):
-        required_splits = math.ceil(tokens / Constants.MAX_TOKEN_LENGTH)
+        required_splits = math.ceil(tokens / Constants.TEXT_SPLIT_MAX_TOKEN_LENGTH)
         chunks = split_with_overlap(elemet_to_split=paragraph, num_parts=required_splits,
                                     overlap=Constants.PARAGRAPH_SPLIT_OVERLAP)
         cleaned_chunks = self._clean_text_chunks(chunks)
@@ -139,7 +139,7 @@ class TextTokenSplitter:
 
 if __name__ == "__main__":
     # Example usage:
-    Constants.MAX_TOKEN_LENGTH = 50
+    Constants.TEXT_SPLIT_MAX_TOKEN_LENGTH = 50
     Constants.PARAGRAPH_SPLIT_OVERLAP = 10
     test_text = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin eget vehicula risus. Pellentesque 
     habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vestibulum tortor quam, 

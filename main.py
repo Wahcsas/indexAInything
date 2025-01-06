@@ -31,8 +31,8 @@ def prompt_llm_for_persons(prompt_list):
         print(f'Prompting for part {nr}/{total_parts} using {prompt_creator.count_tokens_in_prompt_history()} tokens')
         ai_response = openAI_connector.send_prompt(model=Constants.MODEL_NAME,
                                                    prompt=prompts,
-                                                   top_p=1,
-                                                   temp=1)
+                                                   top_p=Constants.TOP_P,
+                                                   temp=Constants.TEMPERATURE)
         print('AI RESPONSE is: ', ai_response)
         current_dict = json_parser.json_to_dict(ai_response)
         print(f'CURRENT dict is \n {current_dict}')
@@ -63,7 +63,9 @@ def index_for_names(pdf_file):
     names_df['id'] = names_df[Constants.EXTRACT_COLUMN_KEYS[0]] + '_' + names_df[Constants.EXTRACT_COLUMN_KEYS[1]]
     names_df = names_df.set_index('id')
     name_to_pages = run_name_index(names_list=list(names_df.index), pdf_path=pdf_file, exclude_pages=[])
-    return name_to_pages
+    names_df['pages'] = names_df.index.map(name_to_pages)
+    names_df = names_df.dropna(subset=['pages'])
+    return names_df
 
 
 def main():
