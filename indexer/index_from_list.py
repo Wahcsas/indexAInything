@@ -28,50 +28,114 @@ def read_pdf_pages(pdf_path: str | pathlib.Path) -> dict[int:str]:
     return pdf_text
 
 
-def find_name_pages(names: list, pdf_pages: dict, exclude_pages: list, footnote_patterns: list[str]) -> dict[
-                                                                                                        str:list[int]]:
+def filter_positive_matches(text, positive_pattern, negative_patterns,
+                            context_window_before=10, context_window_after=10, ignore_case=True) -> list:
+    """
+    Finds matches of the positive pattern in text and filters out those that match any of the negative patterns.
+
+    :param text: The text to search within.
+    :param positive_pattern: Regex pattern for the positive matches.
+    :param negative_patterns: List of regex patterns to exclude.
+    :param context_window_before: Number of characters before the match to check for negative patterns.
+    :param context_window_after: Number of characters after the match to check for negative patterns.
+    :param ignore_case: Whether to perform case-insensitive matching.
+    :return: List of filtered matches (strings).
+    """
+    # Compile regex patterns with or without ignore case flag
+    flags = re.IGNORECASE if ignore_case else 0
+    positive_pattern_compiled = re.compile(positive_pattern, flags)
+    negative_patterns_compiled = [re.compile(neg, flags) for neg in negative_patterns]
+
+    # Step 1: Find all occurrences of the positive pattern
+    matches = positive_pattern_compiled.finditer(text)
+
+    filtered_matches = []
+
+    for match in matches:
+        start, end = match.span()
+
+        # Step 2: Check if any negative pattern matches the specified context window around the match
+        is_negative = False
+        for neg in negative_patterns_compiled:
+            context_to_check = text[max(0, start - context_window_before):end + context_window_after]
+            if neg.search(context_to_check):
+                is_negative = True
+                break
+
+        # Step 3: If no negative pattern is found, keep the match
+        if not is_negative:
+            filtered_matches.append(match.group())
+
+    return filtered_matches
+
+
+def remove_split_char(input_text: str, split_char: str, return_part: int = 0) -> str:
+    input_text = input_text.split(split_char)
+    return input_text[return_part].strip()
+
+
+def find_name_pages(names: list, pdf_text: dict[int:str],
+                    exclude_pages: list, footnote_patterns: str,
+                    remove_part_split_char: str | None = None):
     name_pages = {name: [] for name in names}
 
     for name in names:
         parts = name.split('_')
-        last_name = parts[0] if len(parts[0]) > 0 else ''
-        first_name = parts[1] if len(parts) > 1 and len(parts[1]) > 0 else ''
+        if len(parts) > 1:  # FIRT AND LAST NAME
+            last_name: str = parts[0]
+            first_name: str = parts[1]
+            if remove_part_split_char:
+                last_name = remove_split_char(input_text=last_name,
+                                              split_char='(')
+            # Pattern to match full name, last name, and possessive forms, but not as part of footnotes
+            name_pattern = rf"\b{first_name}[ ,]{last_name}(?:s|es|\b)|\b{last_name}(?:s|es|\b)[ ,]{first_name}"
+        else:  # ONLY ONE NAME PART
+            last_name: str = parts[0]
+            if remove_part_split_char:
+                last_name = remove_split_char(input_text=last_name,
+                                              split_char='(')
+                name_pattern = rf"\b{last_name}(?:s|es|\b)"
 
-        # Pattern to match full name, last name, and possessive forms, but not as part of footnotes
-        name_pattern = rf'\b{last_name}(?:,?\s+{first_name})?\b|\b{first_name}\s+{last_name}\b'
-        name_regex = re.compile(name_pattern, re.IGNORECASE)
-
-        footnotes_reg_with_name = [n.replace('name', last_name) for n in footnote_patterns]
         # Prepare regex for footnotes
-        footnote_regexes = [re.compile(pattern, re.IGNORECASE) for pattern in footnotes_reg_with_name]
-
-        for page_number, text in pdf_pages.items():
+        negative_regex_last_name = [n.replace('name', last_name) for n in footnote_patterns]
+        negative_regex_all_names = [n.replace('name', f"{first_name} {last_name}") for n in footnote_patterns]
+        negative_regex = negative_regex_last_name + negative_regex_all_names
+        for page_number, text in pdf_text.items():
             if page_number in exclude_pages:
                 continue  # Skip excluded pages
+            # replace nonbreak space with normal space for better more unified search results
+            text = text.replace(' ', ' ')
+            found_matches = filter_positive_matches(text=text,
+                                                    negative_patterns=negative_regex,
+                                                    positive_pattern=name_pattern,
+                                                    context_window_after=10,
+                                                    context_window_before=10,
+                                                    ignore_case=True)
+            if len(found_matches) > 0:
+                name_pages[name].append(page_number)
 
-            # First check the entire text for the name
-            if name_regex.search(text):
-                # Check specifically for footnotes
-                if any(footnote_regex.search(text) for footnote_regex in footnote_regexes):
-                    # If found in footnotes, check if also found outside of the footnotes, by trying to find the
-                    # shortest text for each individual split via footnote_regex, we find the text WITHOUT the footnotes
-                    text_without_footnotes = min(footnote_regex.split(text)[0] for footnote_regex in footnote_regexes)
-                    if name_regex.search(text_without_footnotes):
-                        name_pages[name].append(page_number)
-                else:
-                    name_pages[name].append(page_number)
-            # If not found in the main text, don't add the page number even if found in the footnote
-    # make pages unique
-    name_pages = {name: set(pages) for name, pages in name_pages.items() if len(pages) > 0}
     return name_pages
 
 
-def run_name_index(pdf_path: str, names_list: list, exclude_pages: list) -> dict[str:list[int]]:
+def apply_page_offset_to_name_page_dict(name_to_pages: dict[str:int], offset: int) -> dict:
+    """removes the offset value from all pages"""
+    return {key: [i + offset for i in value] for key, value in name_to_pages.items()}
+
+
+def run_name_index(pdf_path: str,
+                   names_list: list,
+                   exclude_pages: list,
+                   pages_offset: int = 0) -> dict[str:list[int]]:
     # Extract names and read PDF
     pdf_pages = read_pdf_pages(pdf_path)
 
     # Use the function to find the pages for each name
-    name_to_pages = find_name_pages(names=names_list, pdf_pages=pdf_pages,
-                                    exclude_pages=exclude_pages, footnote_patterns=Constants.FOOTNOTE_RE_PATTERNS)
+    name_to_pages = find_name_pages(names=names_list,
+                                    pdf_text=pdf_pages,
+                                    exclude_pages=exclude_pages,
+                                    footnote_patterns=Constants.FOOTNOTE_RE_PATTERNS)
+
+    name_to_pages = apply_page_offset_to_name_page_dict(name_to_pages=name_to_pages,
+                                                        offset=pages_offset)
 
     return name_to_pages
