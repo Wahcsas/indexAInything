@@ -1,7 +1,5 @@
-import os
 
 import openai
-import os
 from API_Connector.api_abstract import connectToAPI
 from Constants import Constants
 
