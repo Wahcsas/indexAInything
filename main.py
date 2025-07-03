@@ -2,9 +2,8 @@ import gradio as gr
 import pandas as pd
 from Constants import Constants
 from indexer.index_from_list import run_name_index
-from utils import str_utils, prompt_utils
-from API_Connector import openAI
-from utils.json_utils import JsonStrToDict
+from utils import str_utils
+from utils.pydantic_agent_system import NameExtractionAgent
 from utils.other_utils import clean_pandas_df
 
 
@@ -16,44 +15,21 @@ def split_pdf_text(pdf_file: str):
 
 
 def prompt_llm_for_persons(prompt_list):
-    openAI_connector = openAI.ConnectOpenAI(dummy=False, url=Constants.LLM_URL)
-    prompt_creator = prompt_utils.PromptCreator(Constants.SYSTEM_PROMPT)
-    set_up_examples(prompt_creator)
-    print(prompt_creator.get_prompt_history())
-    names_list: list = []
-    total_parts = len(prompt_list)
-
+    agent = NameExtractionAgent()
     dict_list: list = []
-    json_parser = JsonStrToDict()
-    for nr, prompt in enumerate(prompt_list):
-        prompt_creator.add_user_prompt(Constants.USER_BASE_PROMPT + prompt)
-        prompts = prompt_creator.get_prompt_history()
-        print(f'Prompting for part {nr}/{total_parts} using {prompt_creator.count_tokens_in_prompt_history()} tokens')
-        ai_response = openAI_connector.send_prompt(model=Constants.MODEL_NAME,
-                                                   prompt=prompts,
-                                                   top_p=Constants.TOP_P,
-                                                   temp=Constants.TEMPERATURE)
-        print('AI RESPONSE is: ', ai_response)
-        current_dict = json_parser.json_to_dict(ai_response)
-        print(f'CURRENT dict is \n {current_dict}')
-
-        if len(current_dict) > 0:
-            print(f'Appending from {nr} with len: {len(current_dict)}')
+    for prompt in prompt_list:
+        current_dict = agent.process_chunk(prompt)
+        if current_dict:
             dict_list.append(current_dict)
-        names_list.append(ai_response)
-        prompt_creator.delete_prompt_history()
 
-        #  add logic to search for and correct json then extract actual pdf page
+    if not dict_list:
+        return pd.DataFrame(columns=Constants.EXTRACT_COLUMN_KEYS)
+
     df_list = [pd.DataFrame(d) for d in dict_list]
     combined_df = pd.concat(df_list, ignore_index=True)
     combined_df = clean_pandas_df(combined_df)
     return combined_df
 
-
-def set_up_examples(prompt_creator: prompt_utils.PromptCreator):
-    for user_prompt, assistant_answer in zip(Constants.EXAMLES_USER, Constants.EXAMPLES_ASSISTANT):
-        prompt_creator.add_user_prompt(user_prompt)
-        prompt_creator.add_assistant_message(assistant_answer)
 
 
 def index_for_names(pdf_file) -> pd.DataFrame:
@@ -66,7 +42,7 @@ def index_for_names(pdf_file) -> pd.DataFrame:
     names_df = names_df.set_index('id')
     name_to_pages = run_name_index(names_list=list(names_df.index), pdf_path=pdf_file, exclude_pages=[], pages_offset=19)
     names_df['pages'] = names_df.index.map(name_to_pages)
-    # drop NAN,. None, null values and EMPTY list, i.e. not found
+    # drop NAN. None, null values and EMPTY list, i.e. not found
     names_df = names_df.dropna(subset=['pages'])
     names_df = names_df[~names_df['pages'].str.len().eq(0)]
     return names_df
@@ -89,17 +65,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-test_string_no_brackets = '{"First Name": "David", "Last Name": "Miller"}'
-test_string= "[{'First Name': 'M. Steven', 'Last Name': 'Fish'}]"
-json_parser = JsonStrToDict()
-dict_list = []
-for nr, text in enumerate([test_string_no_brackets, test_string]):
-    current_dict = json_parser.json_to_dict(text)
-    if len(current_dict) > 0:
-            print(f'Appending from {nr} with len: {len(current_dict)}')
-            dict_list.append(current_dict)
-df_list = [pd.DataFrame(d) for d in dict_list]
-combined_df = pd.concat(df_list, ignore_index=True)

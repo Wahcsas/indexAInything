@@ -16,7 +16,7 @@ class Constants:
     TEXT_SPLIT_MAX_TOKEN_LENGTH = 1024
     AVG_TOKEN_CHARACKTER_COUNT = 3.25
     PARAGRAPH_SPLIT_OVERLAP = 150
-    MODEL_NAME = 'llama3.2:latest' #'phi3:14b-medium-128k-instruct-q8_0'  # 'llama3.2:latest'  # 'mistral:7b'
+    MODEL_NAME = 'magistral:24b'#'llama3.2:latest' #'phi3:14b-medium-128k-instruct-q8_0'  # 'llama3.2:latest'  # 'mistral:7b'
 
     EXTRACT_COLUMN_KEYS = ["First Name", "Last Name"]
     SYSTEM_PROMPT = """You are an expert in extracting author names from quotations or references in texts
