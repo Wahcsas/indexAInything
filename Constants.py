@@ -13,51 +13,43 @@ class Constants:
     # We generally recommend altering this or temperature but not both.
     TOP_P = 1.0
 
-    TEXT_SPLIT_MAX_TOKEN_LENGTH = 1024
+    TEXT_SPLIT_MAX_TOKEN_LENGTH = 768
     AVG_TOKEN_CHARACKTER_COUNT = 3.25
     PARAGRAPH_SPLIT_OVERLAP = 150
     MODEL_NAME = 'magistral:24b'#'llama3.2:latest' #'phi3:14b-medium-128k-instruct-q8_0'  # 'llama3.2:latest'  # 'mistral:7b'
 
-    EXTRACT_COLUMN_KEYS = ["First Name", "Last Name"]
-    SYSTEM_PROMPT = """You are an expert in extracting author names from quotations or references in texts
-    and returning them in json format.
-    Analyse the provided texts carefully and check if there are any quotation or references to AUTHORS NAMES,
-    first name or last name, in it.
+    EXTRACT_COLUMN_KEYS = ["First_Name", "Last_Name"]
+    SYSTEM_PROMPT = """You are an expert in extracting person full names, i.e. first name and last name from texts.
+    All names have to be returned via a function tool call and json format like this:
+    final_result({"names":[{"First_Name":"...","Last_Name":"..."}]})
     
-    Do NOT extract names of countries, places, organizations, parties, or other non-person entities.
-    Thus,return ONLY NAMES FROM authors (first names, last names) from the text.
+    Analyse the provided texts carefully and check if there are any quotation or references any persons first name or last name, in it.
     If a first or last name part  is not mentioned in the text, analyse if the mentioned part is a first or last name
-    part and return ONLY the part mentioned directly in the text AND "-" for the other keys.
-    If there is no name in the whole text simply return: "no name found".
-    
-    Return all names of persons as json in the following list json format. 
-    If there are multiple names within the text, return a list of valid jsons, like this: 
-    [{"First Name": "first_name", "Last Name": "last_name"}, {"First Name": "first_name", "Last Name": "last_name"}, ...]
-    
-    It is imperative that all your answers ONLY contain the names in the json format. Do NOT provide any other
-    comment or explanations ONLY the names within the json
-    """
+    part and return ONLY the part mentioned directly in the text and "-" for the other keys.
+    If there are no person names, output exactly this and nothing else (no explanation, no extra whitespace):
+    final_result({"names":[]})
 
-    USER_BASE_PROMPT = """ Please extract author names from quotations or references from the following text.
-    Do NOT extract names of countries, places, organizations, parties, or other non-person entities.
-    It is imperative that your answer ONLY contain names from referenced authors in a valid json format, like this:
-    [{"First Name": "first_name", "Last Name": "last_name"}, ... ].
-    If there is no name from a person in the whole text simply return: "no name found".
+    Do NOT extract organizations, countries, places, parties, or other non-person entities.    
+    Do answer in a free-form text; go straight to the structured call, 
     
-    TEXT:
-    """
+    In short: Extract all **person** full names only and return them in the following tool calling json format.
+    Examples:
+    Input: "I spoke with Alice Johnson and the UNICEF team in Geneva."
+    Output: final_result({"names":[{"First_Name":"Alice","Last_Name":"Johnson"}]})
+    
+    Input: "The conference was hosted by Spain and attended by delegates."
+    Output: final_result({"names":[]})
+    
+    Input: "Augustinus wrote an autobiography in Africa and Newton a book about gravity in Cambridge, England"
+    Output: final_result({"names":[{"First_Name":"Augustinus","Last_Name":"-"},{"First_Name":"-","Last_Name":"Newton"}]})
+    
+    Input: "Met Dr. Bob Lee and CEO Clara Smith from OpenAI."
+    Output: final_result({"names":[{"First_Name":"Bob","Last_Name":"Lee"},{"First_Name":"Clara","Last_Name":"Smith"}]})"""
 
-    EXAMLES_USER = [
-        "So if one asks is there anything faster than light. The answer is: No!, as shown by Albert Einstein and Paul Hawking. However there biggest contribution to science, but in winning the gold medal for France, Germany and the USA.",
-        "Based on the works of Saint Augustine, Dr. Francianos has shown that the Theology is the search for answers that are bigger than us. In contrast, Veltranova (2023) critiques Francianos for what she describes as an 'overemphasis on existential abstraction'",
-        "Recent studies in the field of epistemic theology have highlighted the complex interplay between divine ontology and analytic methodology. As noted by Krieber (2017, p. 45), the quest for a coherent epistemic framework often encounters the 'ontological paradox', wherein the divine attributes defy standard propositional structures. This argument is further elaborated by Mandrel and Osterlich (2019), who emphasize the necessity of integrating modal reasoning within perfect being theology to account for divine aseity."
-        "In the field of political science, the analysis of electoral behavior and party dynamics often highlights significant regional and cultural variations. There are multiple parties like the AfD, the Democrats, the Repuplicans or the Greens that represent different political views. In Germany, the Christian Democratic Union (CDU), lead by Hans Günther Mayer, has historically maintained strongholds in regions such as Bavaria and Baden-Württemberg, while urban centers like Berlin and Hamburg have shown greater support for parties like the Social Democratic Party (SPD) and The Greens."]
+    USER_BASE_PROMPT = """ Reminder: Respond only by calling final_result(...) with JSON; do not give free-form prose first.
+    Please extract persons names from the following text: \n """
 
-    EXAMPLES_ASSISTANT = [
-        '[{"First Name": "Albert", "Last Name": "Einstein"}, {"First Name": "Paul", "Last Name": "Hawking"}]',
-        '[{"First Name": "Augustine", "Last Name": "-"},  {"First Name": "-", "Last Name": "Francianos"}, {"First Name": "-", "Last Name": "Veltranova"}]',
-        '[{"First Name": "-", "Last Name": "Krieber"},  {"First Name": "-", "Last Name": "Mandrel"},  {"First Name": "-", "Last Name": "Osterlich"}],'
-        '[{"First Name": "Hans Günther", "Last Name": "Mayer"}]']
+
 
     FOOTNOTE_RE_PATTERNS = [r'\d+\t\nSee name+',
                             r'\d+\t\nvgl\. name+',
