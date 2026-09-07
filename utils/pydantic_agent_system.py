@@ -38,7 +38,7 @@ class NameExtractionAgent:
             #error here evtl . agent not init with openai: in front
             model=f"openai:{Constants.MODEL_NAME}",
             system_prompt=Constants.SYSTEM_PROMPT,
-            #instructions=Constants.SYSTEM_PROMPT,
+            #instructions=Constants.SYSTEM_PROMPT,  # TODO: Check dif between system_prompt vs. instructions
             output_type=NativeOutput(NamesPayload),
             retries=2,
             history_processors=[debug_history]
@@ -52,7 +52,6 @@ class NameExtractionAgent:
         extraction_prompt = Constants.USER_BASE_PROMPT +  "```" + text + "```"
         try:
             extraction_result = self.extract_agent.run_sync(extraction_prompt, model_settings=self.model_settings)
-
             pprint(extraction_result.output.names)
             candidates = extraction_result.output.names
         except UnexpectedModelBehavior:

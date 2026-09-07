@@ -40,8 +40,8 @@ class Constants:
     Input: "The conference was hosted by Spain and attended by delegates."
     Output: final_result({"names":[]})
     
-    Input: "Augustinus wrote an autobiography in Africa and Newton a book about gravity in Cambridge, England"
-    Output: final_result({"names":[{"First_Name":"Augustinus","Last_Name":"-"},{"First_Name":"-","Last_Name":"Newton"}]})
+    Input: "Augustinus schrieb eine Autobiographie in Afrika und Isaak Newton sein Büch über die Schwerkraft in Cambridge, England"
+    Output: final_result({"names":[{"First_Name":"Augustinus","Last_Name":"-"},{"First_Name":"Isaak","Last_Name":"Newton"}]})
     
     Input: "Met Dr. Bob Lee and CEO Clara Smith from OpenAI."
     Output: final_result({"names":[{"First_Name":"Bob","Last_Name":"Lee"},{"First_Name":"Clara","Last_Name":"Smith"}]})"""
@@ -51,6 +51,9 @@ class Constants:
 
 
 
-    FOOTNOTE_RE_PATTERNS = [r'\d+\t\nSee name+',
-                            r'\d+\t\nvgl\. name+',
-                            r'\d+\t\nname+']
+    FOOTNOTE_RE_PATTERNS = [r'vgl\.\sname+',
+                            r'Vgl\.\sname+'
+                            r'in:\sname+',
+                            r'\d+\tname+',
+                            r'\d+\sname+',
+                            ]

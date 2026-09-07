@@ -1,3 +1,5 @@
+import os.path
+
 import gradio as gr
 import pandas as pd
 from Constants import Constants
@@ -6,6 +8,11 @@ from utils import str_utils
 from utils.pydantic_agent_system import NameExtractionAgent
 from utils.other_utils import clean_pandas_df
 
+
+LOCAL_OUTPUT_DIR = 'E:\pydev2\indexAInything\output'
+PAGES_OFFSET = 0  # AT WHICHT NUMBER TO START COUNTING
+
+EXCLUDE_PAGES = [1,2,3,4,5,6]
 
 def split_pdf_text(pdf_file: str):
     pdf_text = str_utils.get_total_pdf_text(pdf_file)
@@ -39,14 +46,18 @@ def index_for_names(pdf_file) -> pd.DataFrame:
     names_df: pd.DataFrame = prompt_llm_for_persons(split_text)
     names_df['id'] = names_df[Constants.EXTRACT_COLUMN_KEYS[0]] + '_' + names_df[Constants.EXTRACT_COLUMN_KEYS[1]]
     # DROP TOTAL DUPLICATES
-
+    # TODO: Do not drop and simply keep first (keep keyword) keep name with most information, i.e. first and last name
+    names_df.to_csv(os.path.join(LOCAL_OUTPUT_DIR, 'names_orig_llm.csv'))
     names_df = names_df.drop_duplicates(subset=['id'])
     names_df = names_df.set_index('id')
-    name_to_pages = run_name_index(names_list=list(names_df.index), pdf_path=pdf_file, exclude_pages=[], pages_offset=19)
+    names_df.to_csv(os.path.join(LOCAL_OUTPUT_DIR, 'names_clean.csv'))
+    # TODO: implement field for offset in gradio frontend
+    name_to_pages = run_name_index(names_list=list(names_df.index), pdf_path=pdf_file, exclude_pages=EXCLUDE_PAGES, pages_offset=PAGES_OFFSET)
     names_df['pages'] = names_df.index.map(name_to_pages)
     # drop NAN. None, null values and EMPTY list, i.e. not found
     names_df = names_df.dropna(subset=['pages'])
     names_df = names_df[~names_df['pages'].str.len().eq(0)]
+    names_df.to_csv(os.path.join(LOCAL_OUTPUT_DIR, 'output.csv'))
     return names_df
 
 

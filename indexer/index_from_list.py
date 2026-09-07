@@ -81,14 +81,14 @@ def find_name_pages(names: list, pdf_text: dict[int:str],
 
     for name in names:
         parts = name.split('_')
-        if len(parts) > 1:  # FIRT AND LAST NAME
+        if len(parts) > 1:  # FIRST AND LAST NAME
             last_name: str = parts[0]
             first_name: str = parts[1]
             if remove_part_split_char:
                 last_name = remove_split_char(input_text=last_name,
                                               split_char='(')
             # Pattern to match full name, last name, and possessive forms, but not as part of footnotes
-            name_pattern = rf"\b{first_name}[ ,]{last_name}(?:s|es|\b)|\b{last_name}(?:s|es|\b)[ ,]{first_name}"
+            name_pattern = rf"\b{first_name}[ ,\n]{last_name}(?:s|es|\b)|\b{last_name}(?:s|es|\b)[ ,\n]{first_name}"
         else:  # ONLY ONE NAME PART
             last_name: str = parts[0]
             if remove_part_split_char:
