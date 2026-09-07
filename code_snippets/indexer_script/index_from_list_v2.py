@@ -5,22 +5,28 @@ from docx import Document
 from pathlib import Path
 
 # Paths to your files (adjust these as necessary)
-docx_path = Path(r"D:\python_projects\indexer_script\02689 Dahlke_One nation under God_Der US-Katholizismus und die Politik_Personenregister.docx")
-pdf_path = Path(r"D:\python_projects\indexer_script\02689_Dahlke_One-Nation-under-God_rk5.pdf")
+register_file_path = Path(r"E:\pydev2\indexAInything\code_snippets\data\Diss_Register.docx")
+book_text_path = Path(r"E:\pydev2\indexAInything\code_snippets\data\Diss_Manuskript.pdf")
 
-exclude_pages = [1, 2, 3, 4, 5, 6, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288]
+exclude_pages = [1, 2, 3, 4, 5, 6,7, 8, 9, 10,11, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402]
                  # pages to exclude, e.g., table of contents
 
 pages_offset = 0  # offset of page numbers as written in pdf from acutal pymupdf counting
 
+# footnote_patterns = [
+#     r'[Vv]gl\. name'
+#     r'[Ss]iehe\s+\w+\s+\w+\s+und name',
+#     r'[Vv]gl\.\s+\w+\s+\w+\s+und name'
+#     r'[Ss]iehe auch name',
+#     r'[.]\s\nname:',
+#     r'[.]\sname:'
+# ]
+
+# simple footnote patterns
 footnote_patterns = [
-    r'[Vv]gl\. name'
-    r'[Ss]iehe\s+\w+\s+\w+\s+und name',
-    r'[Vv]gl\.\s+\w+\s+\w+\s+und name'
-    r'[Ss]iehe auch name',
-    r'[.]\s\nname:',
-    r'[.]\sname:'
+    r'name:'
 ]
+
 #
 # english_footnote_patterns = [
 #     r'[C,c]f. name'
@@ -104,25 +110,85 @@ def read_pdf_with_pages(pdf_path) -> dict[int:str]:
 def find_name_pages(names:list, pdf_text:dict[int:str],
                     exclude_pages: list, footnote_patterns:str,
                     remove_part_split_char: str | None=None):
+    """
+    Find the PDF pages on which each specified name occurs.
+
+    Searches the extracted text of each PDF page for occurrences of the given
+    names. Both "Last, First" / "Last First" and "First Last" forms are
+    recognized. Matches that correspond to predefined footnote patterns are
+    filtered out, and explicitly excluded pages are skipped.
+
+    Args:
+        names: Names to search for. Names are expected primarily in
+            "Last Name, First Name" format.
+        pdf_text: Mapping of PDF page numbers to their extracted text.
+        exclude_pages: Page numbers that should not be searched.
+        footnote_patterns: Regex patterns used to identify and exclude matches
+            occurring in footnote-like contexts. Each pattern may contain the
+            placeholder ``"name"``, which is replaced with the name being
+            searched for.
+        remove_part_split_char: Optional character indicating that part of a
+            last name should be removed before searching. If present in the
+            last name, only the portion before the delimiter is used.
+
+    Returns:
+        A dictionary mapping each original name to a list of page numbers on
+        which the name was found.
+
+    """
     name_pages = {name: [] for name in names}
 
     for name in names:
         parts = name.split(', ')
-        last_name:str = parts[0]
-        first_name:str = parts[1] if len(parts) > 1 else ''
+        if len(parts) > 1: # for traditional names styles e.g. Smith, John
+            last_name:str = parts[0]
+            first_name:str = parts[1] if len(parts) > 1 else ''
 
-        if remove_part_split_char:
-            if remove_part_split_char in last_name:
-                last_name = last_name.split('(')
-                last_name = last_name[0].strip()
+            if remove_part_split_char:
+                if remove_part_split_char in last_name:
+                    last_name = last_name.split('(')
+                    last_name = last_name[0].strip()
 
-        # Pattern to match full name, last name, and possessive forms, but not as part of footnotes
-        name_pattern = rf'\b{last_name}(?:,?\s+{first_name})?\b|\b{first_name}\s+{last_name}\b'
+            # Pattern to match full name, last name, and possessive forms, but not as part of footnotes
+            #name_pattern = rf'\b{last_name}(?:,?\s+{first_name})?\b|\b{first_name}\s+{last_name}\b'
+            name_pattern = (
+                rf'\b{last_name}s?(?:,?\s+{first_name})?\b'
+                rf'|\b{first_name}\s+{last_name}s?\b'
+            )
 
-        # Prepare regex for footnotes
-        negative_regex_last_name = [n.replace('name', last_name) for n in footnote_patterns]
-        negative_regex_all_names = [n.replace('name', f"{first_name} {last_name}") for n in footnote_patterns]
-        negative_regex = negative_regex_last_name + negative_regex_all_names
+            # Prepare regex for footnotes
+            negative_regex_last_name = [n.replace('name', last_name) for n in footnote_patterns]
+            negative_regex_all_names = [n.replace('name', f"{first_name} {last_name}") for n in footnote_patterns]
+            negative_regex = negative_regex_last_name + negative_regex_all_names
+        else:
+            # Historical/single-name format:
+            # "Thomas von Aquin", "Theophilus von Antiochien", "Voltaire", "Augustin"
+            full_name = parts[0]
+
+            if remove_part_split_char and remove_part_split_char in full_name:
+                full_name = full_name.split(remove_part_split_char)[0].strip()
+
+            short_name = full_name.split()[0]
+
+            name_pattern = (
+                rf'\b{full_name}s?\b'
+                rf'|\b{short_name}s?\b'
+            )
+
+            # name_pattern = (
+            #     rf"\b{full_name}(?:s|'s|’s)?\b"
+            #     rf"|\b{short_name}(?:s|'s|’s)?\b"
+            # )
+
+            negative_regex_full_name = [
+                n.replace('name', full_name)
+                for n in footnote_patterns
+            ]
+            negative_regex_short_name = [
+                n.replace('name', short_name)
+                for n in footnote_patterns
+            ]
+            negative_regex = negative_regex_full_name + negative_regex_short_name
         for page_number, text in pdf_text.items():
             if page_number in exclude_pages:
                 continue  # Skip excluded pages
@@ -168,8 +234,8 @@ def update_docx_with_pages(docx_path, name_to_pages, output_path):
 
 
 # Extract names and read PDF
-names_list = extract_names_from_docx(docx_path)
-pdf_pages = read_pdf_with_pages(pdf_path)
+names_list = extract_names_from_docx(register_file_path)
+pdf_pages = read_pdf_with_pages(book_text_path)
 
 # Use the function to find the pages for each name
 name_to_pages = find_name_pages(names=names_list,
@@ -186,9 +252,9 @@ for name, pages in list(name_to_pages.items())[:5]:  # print results for the fir
     print(f"{name}: {sorted(pages)}")
 
 # Define the path for the output DOCX file
-output_docx_path = Path(docx_path.parent, docx_path.stem + '_pages_added' + docx_path.suffix)
+output_docx_path = Path(register_file_path.parent, register_file_path.stem + '_pages_added' + register_file_path.suffix)
 
 # Update the DOCX file with the pages
-update_docx_with_pages(docx_path, name_to_pages, output_docx_path)
+update_docx_with_pages(register_file_path, name_to_pages, output_docx_path)
 
 print("The DOCX file has been updated and saved to:", output_docx_path)
